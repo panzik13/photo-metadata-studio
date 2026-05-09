@@ -1,0 +1,1691 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Photo Metadata Studio</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: rgba(17, 24, 39, 0.82);
+      --panel-solid: #111827;
+      --panel-2: #151f35;
+      --text: #eef2ff;
+      --muted: #98a2b3;
+      --line: rgba(255,255,255,0.10);
+      --accent: #7c3aed;
+      --accent-2: #06b6d4;
+      --good: #22c55e;
+      --warn: #f59e0b;
+      --bad: #ef4444;
+      --shadow: 0 24px 80px rgba(0,0,0,.38);
+      --radius: 22px;
+      --radius-sm: 14px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% 10%, rgba(124,58,237,.32), transparent 32%),
+        radial-gradient(circle at 85% 5%, rgba(6,182,212,.20), transparent 30%),
+        radial-gradient(circle at 50% 105%, rgba(236,72,153,.16), transparent 28%),
+        var(--bg);
+    }
+
+    .app {
+      width: min(1480px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 48px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 20px;
+      align-items: end;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      letter-spacing: -0.04em;
+      font-size: clamp(34px, 4vw, 64px);
+      line-height: .96;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      max-width: 850px;
+      font-size: 16px;
+      line-height: 1.55;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 13px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,.06);
+      color: #dbeafe;
+      white-space: nowrap;
+      font-size: 13px;
+      box-shadow: 0 8px 26px rgba(0,0,0,.18);
+    }
+
+    .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--good); box-shadow: 0 0 0 5px rgba(34,197,94,.14); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(360px, 430px) 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 20px 20px 0;
+    }
+
+    .card-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin: 0 0 6px;
+      font-size: 16px;
+      letter-spacing: -.01em;
+    }
+
+    .card-note {
+      margin: 0 0 16px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .card-body { padding: 20px; }
+    .stack { display: grid; gap: 14px; }
+
+    label {
+      display: block;
+      margin-bottom: 7px;
+      color: #d7def0;
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    input, select, button, textarea {
+      width: 100%;
+      border: 1px solid rgba(255,255,255,.13);
+      border-radius: 13px;
+      background: rgba(255,255,255,.07);
+      color: var(--text);
+      padding: 12px 13px;
+      font-size: 14px;
+      outline: none;
+      transition: border .16s, background .16s, transform .16s;
+    }
+
+    select option, select optgroup { background: #111827; color: #eef2ff; }
+    input[type="range"] { padding: 0; accent-color: var(--accent); }
+    input[type="checkbox"] { width: auto; }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: rgba(124,58,237,.72);
+      background: rgba(255,255,255,.09);
+    }
+
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .row-3 { display: grid; grid-template-columns: 1.2fr .9fr .9fr; gap: 12px; }
+    .row-small { display: grid; grid-template-columns: 1fr 90px 90px; gap: 12px; }
+
+    .dropzone {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-height: 180px;
+      border: 1.5px dashed rgba(167,139,250,.60);
+      border-radius: var(--radius);
+      background: linear-gradient(145deg, rgba(124,58,237,.16), rgba(6,182,212,.08));
+      cursor: pointer;
+      text-align: center;
+      overflow: hidden;
+    }
+
+    .dropzone.dragover {
+      border-color: var(--accent-2);
+      background: linear-gradient(145deg, rgba(6,182,212,.18), rgba(124,58,237,.18));
+      transform: translateY(-1px);
+    }
+
+    .dropzone input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .drop-inner { padding: 22px; }
+    .drop-icon { font-size: 40px; margin-bottom: 8px; }
+    .drop-main { font-weight: 850; font-size: 18px; }
+    .drop-sub { color: var(--muted); font-size: 13px; margin-top: 6px; line-height: 1.45; }
+
+    .pill-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.06);
+      color: #dbeafe;
+      border-radius: 999px;
+      padding: 8px 10px;
+      font-size: 12px;
+    }
+
+    .pill.good { color: #bbf7d0; border-color: rgba(34,197,94,.28); }
+    .pill.warn { color: #fde68a; border-color: rgba(245,158,11,.32); }
+    .pill.bad { color: #fecaca; border-color: rgba(239,68,68,.32); }
+
+    .primary {
+      background: linear-gradient(135deg, var(--accent), #2563eb 55%, var(--accent-2));
+      color: white;
+      border: 0;
+      font-weight: 850;
+      cursor: pointer;
+      padding: 14px 16px;
+      box-shadow: 0 16px 42px rgba(37,99,235,.24);
+    }
+
+    .primary:hover { transform: translateY(-1px); }
+    .primary:disabled { cursor: not-allowed; opacity: .55; transform: none; }
+
+    .secondary {
+      background: rgba(255,255,255,.06);
+      color: #e5e7eb;
+      border: 1px solid var(--line);
+      font-weight: 750;
+      cursor: pointer;
+    }
+
+    .danger-link {
+      background: transparent;
+      color: #fecaca;
+      border: 1px solid rgba(239,68,68,.24);
+      cursor: pointer;
+      font-weight: 750;
+    }
+
+    .map-wrap { border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--line); }
+    #map { height: 310px; width: 100%; z-index: 1; background: #0f172a; }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      padding: 8px;
+      background: rgba(255,255,255,.05);
+      border-radius: 16px;
+      border: 1px solid var(--line);
+    }
+
+    .tab {
+      flex: 1;
+      border: 0;
+      border-radius: 12px;
+      padding: 10px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-weight: 800;
+    }
+
+    .tab.active { background: rgba(255,255,255,.10); color: white; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: grid; gap: 14px; }
+
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(0,0,0,.12);
+    }
+
+    table { width: 100%; border-collapse: collapse; min-width: 860px; }
+    th, td { padding: 13px 14px; border-bottom: 1px solid rgba(255,255,255,.08); text-align: left; vertical-align: top; font-size: 13px; }
+    th { color: #c7d2fe; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; background: rgba(255,255,255,.04); }
+    tr:last-child td { border-bottom: 0; }
+
+    .thumb {
+      width: 58px;
+      height: 58px;
+      object-fit: cover;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #020617;
+    }
+
+    .file-name { font-weight: 800; color: #f8fafc; }
+    .meta-line { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.05);
+      white-space: nowrap;
+    }
+    .status.good { color: #bbf7d0; border-color: rgba(34,197,94,.28); }
+    .status.warn { color: #fde68a; border-color: rgba(245,158,11,.32); }
+    .status.bad { color: #fecaca; border-color: rgba(239,68,68,.32); }
+    .status.wait { color: #bfdbfe; }
+
+    .progress {
+      height: 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      overflow: hidden;
+      border: 1px solid var(--line);
+    }
+    .bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .2s ease; }
+
+    .log {
+      min-height: 98px;
+      max-height: 180px;
+      overflow: auto;
+      padding: 14px;
+      background: rgba(0,0,0,.22);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      color: #cbd5e1;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+
+    .mini-note { color: var(--muted); font-size: 12px; line-height: 1.45; margin-top: 6px; }
+    .divider { height: 1px; background: var(--line); margin: 6px 0; }
+    .hidden { display: none !important; }
+
+    @media (max-width: 1100px) {
+      .grid { grid-template-columns: 1fr; }
+      .hero { grid-template-columns: 1fr; }
+      .hero-badge { width: fit-content; }
+    }
+
+    @media (max-width: 720px) {
+      .app { width: min(100% - 20px, 1480px); padding-top: 18px; }
+      .row, .row-3, .row-small { grid-template-columns: 1fr; }
+      #map { height: 260px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="hero">
+      <div>
+        <h1>Photo Metadata Studio</h1>
+        <p class="subtitle">Lokální nástroj pro dávkovou přípravu vlastních fotek: odstraní původní metadata, nastaví nové exportní údaje, dovolí vybrat zařízení, město/lokaci, datum exportu, rozměry a stáhne vše najednou.</p>
+      </div>
+      <div class="hero-badge"><span class="dot"></span> Zpracování probíhá lokálně v prohlížeči</div>
+    </header>
+
+    <main class="grid">
+      <section class="stack">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">1. Fotky</h2>
+            <p class="card-note">Přetáhni libovolný počet fotek. Vstup: JPEG, PNG, WebP, HEIC/HEIF. HEIC se před zpracováním převede v prohlížeči.</p>
+          </div>
+          <div class="card-body stack">
+            <label class="dropzone" id="dropzone">
+              <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" multiple />
+              <div class="drop-inner">
+                <div class="drop-icon">⇪</div>
+                <div class="drop-main">Přetáhni fotky sem nebo klikni</div>
+                <div class="drop-sub">Metadata z původních souborů se nepřenáší přes canvas export. JPEG dostane nová EXIF metadata, PNG dostane textové metadata chunky.</div>
+              </div>
+            </label>
+            <div class="pill-row" id="selfCheckPills"></div>
+            <button class="danger-link" id="clearBtn" type="button">Vyčistit seznam fotek</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">2. Metadata</h2>
+            <p class="card-note">Výstupní datum je aktuální datum a čas exportu. Preset lokace se ukládá v prohlížeči.</p>
+          </div>
+          <div class="card-body stack">
+            <div>
+              <label for="deviceSelect">Zařízení</label>
+              <select id="deviceSelect"></select>
+              <div class="mini-note">U JPEG se zapíše Make, Model, Software, LensMake, LensModel a základní optické parametry.</div>
+            </div>
+            <div class="row">
+              <div>
+                <label for="softwareMode">OS / Software</label>
+                <select id="softwareMode">
+                  <option value="auto">Automaticky podle zařízení</option>
+                  <option value="manual">Ručně</option>
+                </select>
+              </div>
+              <div>
+                <label for="softwareInput">Hodnota Software</label>
+                <input id="softwareInput" type="text" placeholder="Např. 26.4.2 / MIUI 14" />
+              </div>
+            </div>
+
+            <div>
+              <label for="locationPreset">Město / lokace</label>
+              <select id="locationPreset"></select>
+              <div class="mini-note">Default: Detroit Garage. Přesné souřadnice můžeš upravit kliknutím do mapy nebo ručním zadáním.</div>
+            </div>
+            <div class="row">
+              <div>
+                <label for="latInput">Latitude</label>
+                <input id="latInput" type="number" step="0.000001" />
+              </div>
+              <div>
+                <label for="lngInput">Longitude</label>
+                <input id="lngInput" type="number" step="0.000001" />
+              </div>
+            </div>
+            <div class="row">
+              <div>
+                <label for="altInput">Altitude m</label>
+                <input id="altInput" type="number" step="1" value="183" />
+              </div>
+              <div>
+                <label for="directionInput">Směr foto °</label>
+                <input id="directionInput" type="number" min="0" max="359" step="1" value="0" />
+              </div>
+            </div>
+            <div class="map-wrap"><div id="map"></div></div>
+
+            <div class="divider"></div>
+            <div class="row-3">
+              <div>
+                <label for="newPresetName">Nový preset</label>
+                <input id="newPresetName" type="text" placeholder="Např. Detroit Garage 2" />
+              </div>
+              <button class="secondary" id="saveLocationBtn" type="button">Uložit lokaci</button>
+              <button class="secondary" id="deleteLocationBtn" type="button">Smazat preset</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">3. Export</h2>
+            <p class="card-note">Vyber formát, kvalitu, rozměry/ořez a pojmenování souborů.</p>
+          </div>
+          <div class="card-body stack">
+            <div class="row">
+              <div>
+                <label for="outputFormat">Výstupní formát</label>
+                <select id="outputFormat">
+                  <option value="jpeg">JPEG + EXIF</option>
+                  <option value="png">PNG + text metadata chunks</option>
+                </select>
+              </div>
+              <div>
+                <label for="qualityInput">JPEG kvalita <span id="qualityLabel">0.95</span></label>
+                <input id="qualityInput" type="range" min="0.70" max="1" step="0.01" value="0.95" />
+              </div>
+            </div>
+
+            <div>
+              <label for="sizePreset">Rozměry / ořez</label>
+              <select id="sizePreset">
+                <option value="original">Ponechat původní rozměr</option>
+                <option value="ig45">Instagram feed 4:5 — 1080 × 1350</option>
+                <option value="square">Instagram square 1:1 — 1080 × 1080</option>
+                <option value="story">Story/Reels 9:16 — 1080 × 1920</option>
+                <option value="landscape">Landscape 1.91:1 — 1080 × 566</option>
+                <option value="custom">Vlastní rozměr</option>
+              </select>
+              <div class="mini-note">Ořez používá středový „cover crop“. Původní metadata se před exportem odstraní vždy.</div>
+            </div>
+            <div class="row" id="customSizeRow">
+              <div>
+                <label for="customWidth">Vlastní šířka</label>
+                <input id="customWidth" type="number" min="1" value="1080" />
+              </div>
+              <div>
+                <label for="customHeight">Vlastní výška</label>
+                <input id="customHeight" type="number" min="1" value="1350" />
+              </div>
+            </div>
+
+            <div class="row-small">
+              <div>
+                <label for="filePrefix">Prefix názvu</label>
+                <input id="filePrefix" type="text" value="IMG" />
+              </div>
+              <div>
+                <label for="startNumber">Start</label>
+                <input id="startNumber" type="number" min="0" value="1001" />
+              </div>
+              <div>
+                <label for="padLength">Číslic</label>
+                <input id="padLength" type="number" min="2" max="8" value="4" />
+              </div>
+            </div>
+
+            <label class="pill" style="justify-content:flex-start; width:fit-content;">
+              <input id="alwaysZip" type="checkbox" checked /> Vždy stáhnout jako ZIP
+            </label>
+            <button class="primary" id="processBtn" type="button" disabled>Zpracovat a stáhnout</button>
+            <div class="progress"><div class="bar" id="progressBar"></div></div>
+            <div class="log" id="logBox">Připraveno. Nahraj fotky a spusť zpracování.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="stack">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Kontrola metadat</h2>
+            <p class="card-note">Tabulka ukazuje, co nástroj dokáže vyčíst z originálu a co bude provedeno při exportu.</p>
+          </div>
+          <div class="card-body">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Náhled</th>
+                    <th>Soubor</th>
+                    <th>Rozměry</th>
+                    <th>Původní metadata</th>
+                    <th>Výstupní akce</th>
+                    <th>Stav</th>
+                  </tr>
+                </thead>
+                <tbody id="fileTableBody">
+                  <tr><td colspan="6" style="color: var(--muted);">Zatím nejsou nahrané žádné soubory.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Aktuální exportní metadata</h2>
+            <p class="card-note">Tato sada se zapíše do každého exportovaného souboru. U JPEG jako EXIF, u PNG jako textové chunky.</p>
+          </div>
+          <div class="card-body">
+            <div class="table-wrap">
+              <table style="min-width: 620px;">
+                <tbody id="metadataPreviewBody"></tbody>
+              </table>
+            </div>
+            <p class="mini-note">Poznámka: PNG nepoužívá klasický JPEG EXIF workflow. Proto nástroj u PNG ukládá metadata jako textové PNG chunky a zároveň vždy odstraní původní obrazová metadata canvas exportem.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/piexifjs/1.0.6/piexif.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    "use strict";
+
+    const APP_VERSION = "1.0.0";
+    const LS_KEY = "photo_metadata_studio_v1";
+    const META_SOURCE_NOTE = "Photo Metadata Studio export";
+
+    const defaultLocations = [
+      { id: "detroit_garage", name: "Detroit Garage", city: "Detroit", country: "USA", lat: 42.3314, lng: -83.0458, altitude: 183, direction: 91 },
+      { id: "detroit", name: "Detroit", city: "Detroit", country: "USA", lat: 42.3314, lng: -83.0458, altitude: 183, direction: 91 },
+      { id: "prague", name: "Praha", city: "Prague", country: "Czech Republic", lat: 50.0755, lng: 14.4378, altitude: 235, direction: 0 },
+      { id: "petrovice", name: "Praha Petrovice", city: "Prague", country: "Czech Republic", lat: 50.0363, lng: 14.5572, altitude: 275, direction: 0 },
+      { id: "nyc", name: "New York", city: "New York", country: "USA", lat: 40.7128, lng: -74.0060, altitude: 10, direction: 0 },
+      { id: "la", name: "Los Angeles", city: "Los Angeles", country: "USA", lat: 34.0522, lng: -118.2437, altitude: 89, direction: 0 },
+      { id: "miami", name: "Miami", city: "Miami", country: "USA", lat: 25.7617, lng: -80.1918, altitude: 2, direction: 0 },
+      { id: "london", name: "London", city: "London", country: "United Kingdom", lat: 51.5074, lng: -0.1278, altitude: 11, direction: 0 },
+      { id: "paris", name: "Paris", city: "Paris", country: "France", lat: 48.8566, lng: 2.3522, altitude: 35, direction: 0 },
+      { id: "berlin", name: "Berlin", city: "Berlin", country: "Germany", lat: 52.5200, lng: 13.4050, altitude: 34, direction: 0 },
+      { id: "vienna", name: "Vienna", city: "Vienna", country: "Austria", lat: 48.2082, lng: 16.3738, altitude: 171, direction: 0 },
+      { id: "marrakech", name: "Marrakech", city: "Marrakech", country: "Morocco", lat: 31.6295, lng: -7.9811, altitude: 466, direction: 0 },
+      { id: "agadir", name: "Agadir", city: "Agadir", country: "Morocco", lat: 30.4278, lng: -9.5981, altitude: 74, direction: 0 },
+      { id: "tamraght", name: "Tamraght", city: "Tamraght", country: "Morocco", lat: 30.5087, lng: -9.6787, altitude: 45, direction: 0 },
+      { id: "pula", name: "Pula", city: "Pula", country: "Croatia", lat: 44.8666, lng: 13.8496, altitude: 30, direction: 0 },
+      { id: "cagliari", name: "Cagliari", city: "Cagliari", country: "Italy", lat: 39.2238, lng: 9.1217, altitude: 4, direction: 0 }
+    ];
+
+    const deviceGroups = [
+      { label: "Apple — iPhone 17 / 2026", models: ["iPhone 17e", "iPhone 17 Pro Max", "iPhone 17 Pro", "iPhone 17", "iPhone Air"] },
+      { label: "Apple — iPhone 16", models: ["iPhone 16e", "iPhone 16 Pro Max", "iPhone 16 Pro", "iPhone 16 Plus", "iPhone 16"] },
+      { label: "Apple — iPhone 15", models: ["iPhone 15 Pro Max", "iPhone 15 Pro", "iPhone 15 Plus", "iPhone 15"] },
+      { label: "Apple — iPhone 14", models: ["iPhone 14 Pro Max", "iPhone 14 Pro", "iPhone 14 Plus", "iPhone 14"] },
+      { label: "Apple — iPhone 13", models: ["iPhone 13 Pro Max", "iPhone 13 Pro", "iPhone 13 mini", "iPhone 13"] },
+      { label: "Apple — iPhone 12", models: ["iPhone 12 Pro Max", "iPhone 12 Pro", "iPhone 12 mini", "iPhone 12"] },
+      { label: "Apple — iPhone 11 / X / 8", models: ["iPhone 11 Pro Max", "iPhone 11 Pro", "iPhone 11", "iPhone XS Max", "iPhone XS", "iPhone XR", "iPhone X", "iPhone 8 Plus", "iPhone 8"] },
+      { label: "Apple — iPhone 7 a starší", models: ["iPhone 7 Plus", "iPhone 7", "iPhone SE (3rd generation)", "iPhone SE (2nd generation)", "iPhone SE (1st generation)", "iPhone 6s Plus", "iPhone 6s", "iPhone 6 Plus", "iPhone 6", "iPhone 5s", "iPhone 5c", "iPhone 5", "iPhone 4s", "iPhone 4", "iPhone 3GS", "iPhone 3G", "iPhone"] },
+      { label: "Xiaomi / Redmi", models: ["Redmi 12C"] }
+    ];
+
+    const dom = {
+      fileInput: document.getElementById("fileInput"),
+      dropzone: document.getElementById("dropzone"),
+      selfCheckPills: document.getElementById("selfCheckPills"),
+      clearBtn: document.getElementById("clearBtn"),
+      deviceSelect: document.getElementById("deviceSelect"),
+      softwareMode: document.getElementById("softwareMode"),
+      softwareInput: document.getElementById("softwareInput"),
+      locationPreset: document.getElementById("locationPreset"),
+      latInput: document.getElementById("latInput"),
+      lngInput: document.getElementById("lngInput"),
+      altInput: document.getElementById("altInput"),
+      directionInput: document.getElementById("directionInput"),
+      newPresetName: document.getElementById("newPresetName"),
+      saveLocationBtn: document.getElementById("saveLocationBtn"),
+      deleteLocationBtn: document.getElementById("deleteLocationBtn"),
+      outputFormat: document.getElementById("outputFormat"),
+      qualityInput: document.getElementById("qualityInput"),
+      qualityLabel: document.getElementById("qualityLabel"),
+      sizePreset: document.getElementById("sizePreset"),
+      customSizeRow: document.getElementById("customSizeRow"),
+      customWidth: document.getElementById("customWidth"),
+      customHeight: document.getElementById("customHeight"),
+      filePrefix: document.getElementById("filePrefix"),
+      startNumber: document.getElementById("startNumber"),
+      padLength: document.getElementById("padLength"),
+      alwaysZip: document.getElementById("alwaysZip"),
+      processBtn: document.getElementById("processBtn"),
+      progressBar: document.getElementById("progressBar"),
+      logBox: document.getElementById("logBox"),
+      fileTableBody: document.getElementById("fileTableBody"),
+      metadataPreviewBody: document.getElementById("metadataPreviewBody")
+    };
+
+    let files = [];
+    let fileRows = [];
+    let map = null;
+    let marker = null;
+    let currentLocations = [...defaultLocations];
+
+    patchPiexifTags();
+    populateDeviceSelect();
+    loadState();
+    populateLocationSelect();
+    initMap();
+    bindEvents();
+    runSelfCheck();
+    refreshSoftwareValue();
+    refreshMetadataPreview();
+    refreshCustomSizeVisibility();
+
+    function patchPiexifTags() {
+      if (typeof piexif === "undefined") return;
+      addTag("Exif", "OffsetTime", 36880, 2, piexif.ExifIFD, piexif.TAGS.Exif);
+      addTag("Exif", "OffsetTimeOriginal", 36881, 2, piexif.ExifIFD, piexif.TAGS.Exif);
+      addTag("Exif", "OffsetTimeDigitized", 36882, 2, piexif.ExifIFD, piexif.TAGS.Exif);
+      addTag("Exif", "SubSecTime", 37520, 2, piexif.ExifIFD, piexif.TAGS.Exif);
+      addTag("Exif", "SubSecTimeOriginal", 37521, 2, piexif.ExifIFD, piexif.TAGS.Exif);
+      addTag("Exif", "SubSecTimeDigitized", 37522, 2, piexif.ExifIFD, piexif.TAGS.Exif);
+      addTag("Image", "HostComputer", 316, 2, piexif.ImageIFD, piexif.TAGS.Image);
+    }
+
+    function addTag(ifdName, key, tagId, type, ifd, tags) {
+      if (!ifd || !tags) return;
+      if (!ifd[key]) ifd[key] = tagId;
+      if (!tags[tagId]) tags[tagId] = { name: key, type: type };
+    }
+
+    function populateDeviceSelect() {
+      dom.deviceSelect.innerHTML = "";
+      deviceGroups.forEach(group => {
+        const optgroup = document.createElement("optgroup");
+        optgroup.label = group.label;
+        group.models.forEach(model => {
+          const opt = document.createElement("option");
+          opt.value = model;
+          opt.textContent = model;
+          optgroup.appendChild(opt);
+        });
+        dom.deviceSelect.appendChild(optgroup);
+      });
+      dom.deviceSelect.value = "iPhone 17 Pro Max";
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (!raw) return;
+        const state = JSON.parse(raw);
+        if (Array.isArray(state.customLocations)) currentLocations = [...defaultLocations, ...state.customLocations];
+        setValue(dom.deviceSelect, state.device);
+        setValue(dom.softwareMode, state.softwareMode);
+        setValue(dom.softwareInput, state.softwareInput);
+        setValue(dom.outputFormat, state.outputFormat);
+        setValue(dom.qualityInput, state.quality);
+        setValue(dom.sizePreset, state.sizePreset);
+        setValue(dom.customWidth, state.customWidth);
+        setValue(dom.customHeight, state.customHeight);
+        setValue(dom.filePrefix, state.filePrefix);
+        setValue(dom.startNumber, state.startNumber);
+        setValue(dom.padLength, state.padLength);
+        if (typeof state.alwaysZip === "boolean") dom.alwaysZip.checked = state.alwaysZip;
+      } catch (error) {
+        console.warn("State load failed", error);
+      }
+    }
+
+    function setValue(el, value) {
+      if (el && value !== undefined && value !== null && value !== "") el.value = value;
+    }
+
+    function saveState() {
+      const customLocations = currentLocations.filter(loc => !defaultLocations.some(def => def.id === loc.id));
+      const state = {
+        customLocations,
+        device: dom.deviceSelect.value,
+        softwareMode: dom.softwareMode.value,
+        softwareInput: dom.softwareInput.value,
+        locationPreset: dom.locationPreset.value,
+        lat: dom.latInput.value,
+        lng: dom.lngInput.value,
+        alt: dom.altInput.value,
+        direction: dom.directionInput.value,
+        outputFormat: dom.outputFormat.value,
+        quality: dom.qualityInput.value,
+        sizePreset: dom.sizePreset.value,
+        customWidth: dom.customWidth.value,
+        customHeight: dom.customHeight.value,
+        filePrefix: dom.filePrefix.value,
+        startNumber: dom.startNumber.value,
+        padLength: dom.padLength.value,
+        alwaysZip: dom.alwaysZip.checked
+      };
+      localStorage.setItem(LS_KEY, JSON.stringify(state));
+    }
+
+    function populateLocationSelect() {
+      const selected = getSavedStateValue("locationPreset") || "detroit_garage";
+      dom.locationPreset.innerHTML = "";
+      currentLocations.forEach(loc => {
+        const opt = document.createElement("option");
+        opt.value = loc.id;
+        opt.textContent = `${loc.name} — ${loc.city}, ${loc.country}`;
+        dom.locationPreset.appendChild(opt);
+      });
+      if (currentLocations.some(loc => loc.id === selected)) {
+        dom.locationPreset.value = selected;
+      } else {
+        dom.locationPreset.value = "detroit_garage";
+      }
+      applyLocationPreset(dom.locationPreset.value, false);
+      const savedLat = getSavedStateValue("lat");
+      const savedLng = getSavedStateValue("lng");
+      if (savedLat && savedLng) {
+        dom.latInput.value = savedLat;
+        dom.lngInput.value = savedLng;
+        setValue(dom.altInput, getSavedStateValue("alt"));
+        setValue(dom.directionInput, getSavedStateValue("direction"));
+      }
+    }
+
+    function getSavedStateValue(key) {
+      try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (!raw) return null;
+        const state = JSON.parse(raw);
+        return state[key] ?? null;
+      } catch { return null; }
+    }
+
+    function initMap() {
+      if (typeof L === "undefined") return;
+      const lat = parseFloat(dom.latInput.value) || 42.3314;
+      const lng = parseFloat(dom.lngInput.value) || -83.0458;
+      map = L.map("map", { scrollWheelZoom: false }).setView([lat, lng], 12);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "© OpenStreetMap"
+      }).addTo(map);
+      marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+      marker.on("dragend", () => {
+        const pos = marker.getLatLng();
+        updateCoordinates(pos.lat, pos.lng, true);
+      });
+      map.on("click", e => updateCoordinates(e.latlng.lat, e.latlng.lng, true));
+    }
+
+    function bindEvents() {
+      dom.dropzone.addEventListener("dragover", event => {
+        event.preventDefault();
+        dom.dropzone.classList.add("dragover");
+      });
+      dom.dropzone.addEventListener("dragleave", () => dom.dropzone.classList.remove("dragover"));
+      dom.dropzone.addEventListener("drop", event => {
+        event.preventDefault();
+        dom.dropzone.classList.remove("dragover");
+        handleFiles(event.dataTransfer.files);
+      });
+      dom.fileInput.addEventListener("change", event => handleFiles(event.target.files));
+      dom.clearBtn.addEventListener("click", clearFiles);
+
+      [dom.deviceSelect, dom.softwareMode, dom.softwareInput, dom.locationPreset, dom.latInput, dom.lngInput, dom.altInput, dom.directionInput, dom.outputFormat, dom.qualityInput, dom.sizePreset, dom.customWidth, dom.customHeight, dom.filePrefix, dom.startNumber, dom.padLength, dom.alwaysZip].forEach(el => {
+        el.addEventListener("input", () => {
+          if (el === dom.softwareMode || el === dom.deviceSelect) refreshSoftwareValue();
+          if (el === dom.qualityInput) dom.qualityLabel.textContent = Number(dom.qualityInput.value).toFixed(2);
+          if (el === dom.sizePreset) refreshCustomSizeVisibility();
+          if (el === dom.latInput || el === dom.lngInput) updateMapMarkerFromInputs(false);
+          refreshMetadataPreview();
+          saveState();
+        });
+        el.addEventListener("change", () => {
+          if (el === dom.locationPreset) applyLocationPreset(dom.locationPreset.value, true);
+          refreshMetadataPreview();
+          saveState();
+        });
+      });
+
+      dom.saveLocationBtn.addEventListener("click", saveCustomLocation);
+      dom.deleteLocationBtn.addEventListener("click", deleteCustomLocation);
+      dom.processBtn.addEventListener("click", processAllFiles);
+    }
+
+    async function handleFiles(fileList) {
+      const incoming = Array.from(fileList || []).filter(file => isSupportedInput(file));
+      if (!incoming.length) {
+        log("Nenašel jsem podporovaný obrazový soubor.");
+        return;
+      }
+      files = [...files, ...incoming];
+      dom.processBtn.disabled = files.length === 0 || !hasRequiredLibraries();
+      await analyzeFiles();
+      renderFileTable();
+      log(`Nahráno souborů: ${files.length}`);
+    }
+
+    function isSupportedInput(file) {
+      const name = file.name.toLowerCase();
+      const type = (file.type || "").toLowerCase();
+      return type.startsWith("image/jpeg") || type.startsWith("image/png") || type.startsWith("image/webp") || type === "image/heic" || type === "image/heif" || /\.(jpe?g|png|webp|heic|heif)$/i.test(name);
+    }
+
+    async function analyzeFiles() {
+      fileRows = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const row = {
+          id: `${Date.now()}_${i}_${Math.random().toString(36).slice(2)}`,
+          file,
+          thumbUrl: null,
+          dimensions: "Čeká",
+          originalMetadata: "Kontroluji…",
+          action: buildActionSummary(),
+          status: "Připraveno",
+          statusType: "wait"
+        };
+        fileRows.push(row);
+      }
+      renderFileTable();
+      for (const row of fileRows) {
+        try {
+          row.originalMetadata = await detectOriginalMetadata(row.file);
+          row.thumbUrl = await createThumbUrl(row.file);
+          row.dimensions = await getImageDimensionsLabel(row.file);
+          row.status = "Připraveno";
+          row.statusType = "wait";
+        } catch (error) {
+          row.originalMetadata = "Limitovaná kontrola";
+          row.dimensions = "Nezjištěno";
+          row.status = "Připraveno s upozorněním";
+          row.statusType = "warn";
+        }
+        renderFileTable();
+      }
+    }
+
+    function buildActionSummary() {
+      const format = dom.outputFormat.value.toUpperCase();
+      const device = dom.deviceSelect.value;
+      const size = getOutputSizeLabel();
+      return `${format}; původní metadata pryč; nové zařízení: ${device}; lokace: ${getSelectedLocationName()}; ${size}`;
+    }
+
+    function renderFileTable() {
+      if (!fileRows.length) {
+        dom.fileTableBody.innerHTML = `<tr><td colspan="6" style="color: var(--muted);">Zatím nejsou nahrané žádné soubory.</td></tr>`;
+        return;
+      }
+      dom.fileTableBody.innerHTML = "";
+      fileRows.forEach((row, index) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${row.thumbUrl ? `<img class="thumb" src="${escapeAttr(row.thumbUrl)}" alt="Náhled">` : `<div class="thumb"></div>`}</td>
+          <td><div class="file-name">${escapeHtml(row.file.name)}</div><div class="meta-line">${formatBytes(row.file.size)} · ${escapeHtml(row.file.type || getExt(row.file.name))}</div></td>
+          <td>${escapeHtml(row.dimensions)}</td>
+          <td>${row.originalMetadata}</td>
+          <td>${escapeHtml(buildActionSummary())}</td>
+          <td><span class="status ${row.statusType}">${escapeHtml(row.status)}</span></td>
+        `;
+        dom.fileTableBody.appendChild(tr);
+      });
+      dom.processBtn.disabled = files.length === 0 || !hasRequiredLibraries();
+    }
+
+    function clearFiles() {
+      files = [];
+      fileRows.forEach(row => { if (row.thumbUrl) URL.revokeObjectURL(row.thumbUrl); });
+      fileRows = [];
+      dom.fileInput.value = "";
+      dom.processBtn.disabled = true;
+      dom.progressBar.style.width = "0%";
+      renderFileTable();
+      log("Seznam fotek je vyčištěný.");
+    }
+
+    async function detectOriginalMetadata(file) {
+      const name = file.name.toLowerCase();
+      const type = (file.type || "").toLowerCase();
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      if (type.includes("jpeg") || /\.jpe?g$/i.test(name)) {
+        let summary = [];
+        const hasApp1 = findAscii(bytes, "Exif\u0000\u0000");
+        try {
+          const dataUrl = await fileToDataURL(file);
+          const exif = piexif.load(dataUrl);
+          const zeroth = exif["0th"] || {};
+          const exifIfd = exif.Exif || {};
+          const gps = exif.GPS || {};
+          const make = zeroth[piexif.ImageIFD.Make];
+          const model = zeroth[piexif.ImageIFD.Model];
+          const date = exifIfd[piexif.ExifIFD.DateTimeOriginal] || zeroth[piexif.ImageIFD.DateTime];
+          const gpsCount = Object.keys(gps).length;
+          if (make || model) summary.push(`${escapeHtml(String(make || ""))} ${escapeHtml(String(model || ""))}`.trim());
+          if (date) summary.push(`datum: ${escapeHtml(String(date))}`);
+          if (gpsCount) summary.push("GPS: ano");
+          if (!summary.length && hasApp1) summary.push("EXIF blok nalezen");
+        } catch {
+          if (hasApp1) summary.push("EXIF blok nalezen, ale nejde bezpečně přečíst");
+        }
+        return summary.length ? `<span class="status warn">Ano</span><div class="meta-line">${summary.join(" · ")}</div>` : `<span class="status good">Nenalezeno</span>`;
+      }
+      if (type.includes("png") || /\.png$/i.test(name)) {
+        const chunks = listPngChunks(bytes);
+        const metaChunks = chunks.filter(c => ["tEXt", "iTXt", "zTXt", "eXIf"].includes(c));
+        return metaChunks.length ? `<span class="status warn">Ano</span><div class="meta-line">PNG: ${escapeHtml(metaChunks.join(", "))}</div>` : `<span class="status good">Nenalezeno</span>`;
+      }
+      if (type.includes("webp") || /\.webp$/i.test(name)) {
+        const hasExif = findAscii(bytes, "EXIF");
+        const hasXmp = findAscii(bytes, "XMP ");
+        return hasExif || hasXmp ? `<span class="status warn">Ano</span><div class="meta-line">WebP: ${hasExif ? "EXIF" : ""} ${hasXmp ? "XMP" : ""}</div>` : `<span class="status good">Nenalezeno</span>`;
+      }
+      if (/\.(heic|heif)$/i.test(name) || type.includes("heic") || type.includes("heif")) {
+        return `<span class="status warn">Limitovaná kontrola</span><div class="meta-line">HEIC/HEIF metadata se při převodu odstraní.</div>`;
+      }
+      return `<span class="status warn">Neznámý typ</span>`;
+    }
+
+    async function createThumbUrl(file) {
+      if (/\.(heic|heif)$/i.test(file.name) || (file.type || "").includes("heic") || (file.type || "").includes("heif")) {
+        try {
+          const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.72 });
+          const blob = Array.isArray(converted) ? converted[0] : converted;
+          return URL.createObjectURL(blob);
+        } catch {
+          return null;
+        }
+      }
+      return URL.createObjectURL(file);
+    }
+
+    async function getImageDimensionsLabel(file) {
+      const img = await loadImage(file, true);
+      return `${img.naturalWidth || img.width} × ${img.naturalHeight || img.height}`;
+    }
+
+    async function processAllFiles() {
+      if (!files.length) return;
+      if (!hasRequiredLibraries()) {
+        log("Chybí povinná knihovna. Zkontroluj připojení k CDN nebo vlož knihovny lokálně.");
+        return;
+      }
+      setProgress(0);
+      log(`Start zpracování: ${files.length} souborů.`);
+      const zip = new JSZip();
+      const outputBlobs = [];
+      const started = performance.now();
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const row = fileRows[i];
+        try {
+          row.status = "Zpracovávám…";
+          row.statusType = "wait";
+          renderFileTable();
+          const out = await processOneFile(file, i);
+          outputBlobs.push(out);
+          if (files.length > 1 || dom.alwaysZip.checked) {
+            zip.file(out.name, out.blob);
+          }
+          row.status = "Hotovo";
+          row.statusType = "good";
+          log(`OK: ${file.name} → ${out.name}`);
+        } catch (error) {
+          row.status = "Chyba";
+          row.statusType = "bad";
+          log(`CHYBA: ${file.name}: ${error.message || error}`);
+        }
+        setProgress(((i + 1) / files.length) * 100);
+        renderFileTable();
+      }
+
+      if (!outputBlobs.length) {
+        log("Žádný soubor se nepodařilo zpracovat.");
+        return;
+      }
+
+      if (outputBlobs.length === 1 && !dom.alwaysZip.checked) {
+        downloadBlob(outputBlobs[0].blob, outputBlobs[0].name);
+      } else {
+        const zipBlob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
+        const zipName = `${sanitizeFileName(dom.filePrefix.value || "IMG")}_metadata_export_${timestampForName(new Date())}.zip`;
+        downloadBlob(zipBlob, zipName);
+        log(`ZIP vytvořen: ${zipName} (${formatBytes(zipBlob.size)})`);
+      }
+
+      const seconds = ((performance.now() - started) / 1000).toFixed(1);
+      log(`Hotovo za ${seconds} s. Výstupy jsou stažené.`);
+    }
+
+    async function processOneFile(file, index) {
+      const img = await loadImage(file, false);
+      const canvas = drawOutputCanvas(img);
+      const format = dom.outputFormat.value;
+      const quality = clamp(Number(dom.qualityInput.value) || 0.95, 0.7, 1);
+      const now = new Date();
+      const meta = buildMetadata(now, canvas.width, canvas.height);
+      const filename = buildOutputFileName(index, format);
+
+      if (format === "jpeg") {
+        const cleanDataUrl = canvas.toDataURL("image/jpeg", quality);
+        const exifObj = buildExifObject(meta);
+        const exifBytes = piexif.dump(exifObj);
+        const finalDataUrl = piexif.insert(exifBytes, cleanDataUrl);
+        return { name: filename, blob: dataURLToBlob(finalDataUrl), metadata: meta };
+      }
+
+      const cleanPngDataUrl = canvas.toDataURL("image/png");
+      const pngBytes = dataURLToBytes(cleanPngDataUrl);
+      const withText = addPngTextChunks(pngBytes, buildPngTextMetadata(meta));
+      return { name: filename, blob: new Blob([withText], { type: "image/png" }), metadata: meta };
+    }
+
+    async function loadImage(file, forPreview) {
+      const name = file.name.toLowerCase();
+      const type = (file.type || "").toLowerCase();
+      let blob = file;
+      if (type.includes("heic") || type.includes("heif") || /\.(heic|heif)$/i.test(name)) {
+        if (typeof heic2any === "undefined") throw new Error("HEIC knihovna není načtená.");
+        const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: forPreview ? 0.74 : 0.95 });
+        blob = Array.isArray(converted) ? converted[0] : converted;
+      }
+      const url = URL.createObjectURL(blob);
+      try {
+        const img = await new Promise((resolve, reject) => {
+          const image = new Image();
+          image.onload = () => resolve(image);
+          image.onerror = () => reject(new Error("Obrázek nejde načíst."));
+          image.src = url;
+        });
+        return img;
+      } finally {
+        setTimeout(() => URL.revokeObjectURL(url), 3000);
+      }
+    }
+
+    function drawOutputCanvas(img) {
+      const naturalW = img.naturalWidth || img.width;
+      const naturalH = img.naturalHeight || img.height;
+      const size = getOutputSize(naturalW, naturalH);
+      const canvas = document.createElement("canvas");
+      canvas.width = size.width;
+      canvas.height = size.height;
+      const ctx = canvas.getContext("2d", { alpha: dom.outputFormat.value === "png" });
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+
+      if (size.mode === "original") {
+        ctx.drawImage(img, 0, 0, size.width, size.height);
+        return canvas;
+      }
+
+      const sourceRatio = naturalW / naturalH;
+      const targetRatio = size.width / size.height;
+      let sx = 0, sy = 0, sw = naturalW, sh = naturalH;
+      if (sourceRatio > targetRatio) {
+        sw = naturalH * targetRatio;
+        sx = (naturalW - sw) / 2;
+      } else if (sourceRatio < targetRatio) {
+        sh = naturalW / targetRatio;
+        sy = (naturalH - sh) / 2;
+      }
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, size.width, size.height);
+      return canvas;
+    }
+
+    function getOutputSize(originalW, originalH) {
+      const preset = dom.sizePreset.value;
+      if (preset === "ig45") return { width: 1080, height: 1350, mode: "cover" };
+      if (preset === "square") return { width: 1080, height: 1080, mode: "cover" };
+      if (preset === "story") return { width: 1080, height: 1920, mode: "cover" };
+      if (preset === "landscape") return { width: 1080, height: 566, mode: "cover" };
+      if (preset === "custom") {
+        return {
+          width: Math.max(1, Math.floor(Number(dom.customWidth.value) || 1080)),
+          height: Math.max(1, Math.floor(Number(dom.customHeight.value) || 1350)),
+          mode: "cover"
+        };
+      }
+      return { width: originalW, height: originalH, mode: "original" };
+    }
+
+    function getOutputSizeLabel() {
+      const preset = dom.sizePreset.value;
+      const map = {
+        original: "původní rozměr",
+        ig45: "4:5 1080×1350",
+        square: "1:1 1080×1080",
+        story: "9:16 1080×1920",
+        landscape: "1.91:1 1080×566",
+        custom: `${dom.customWidth.value || 1080}×${dom.customHeight.value || 1350}`
+      };
+      return `rozměr: ${map[preset] || map.original}`;
+    }
+
+    function buildMetadata(now, width, height) {
+      const profile = getDeviceProfile(dom.deviceSelect.value);
+      const software = dom.softwareMode.value === "manual" ? (dom.softwareInput.value || profile.software) : profile.software;
+      const lat = Number(dom.latInput.value);
+      const lng = Number(dom.lngInput.value);
+      const altitude = Number(dom.altInput.value) || 0;
+      const direction = clamp(Number(dom.directionInput.value) || 0, 0, 359);
+      return {
+        appVersion: APP_VERSION,
+        sourceNote: META_SOURCE_NOTE,
+        make: profile.make,
+        model: profile.model,
+        software,
+        lensMake: profile.lensMake,
+        lensModel: profile.lensModel,
+        focal: profile.focal,
+        fNum: profile.fNum,
+        f35: profile.f35,
+        iso: profile.iso,
+        exposure: profile.exposure,
+        width,
+        height,
+        locationName: getSelectedLocationName(),
+        city: getSelectedLocation()?.city || "",
+        country: getSelectedLocation()?.country || "",
+        lat,
+        lng,
+        altitude,
+        direction,
+        dateLocal: formatExifDate(now),
+        dateUtc: formatExifDateUTC(now),
+        gpsDate: `${now.getUTCFullYear()}:${pad2(now.getUTCMonth() + 1)}:${pad2(now.getUTCDate())}`,
+        gpsTime: [[now.getUTCHours(), 1], [now.getUTCMinutes(), 1], [now.getUTCSeconds() * 1000 + now.getUTCMilliseconds(), 1000]],
+        offset: getTimezoneOffsetString(now),
+        subsec: String(now.getMilliseconds()).padStart(3, "0")
+      };
+    }
+
+    function getDeviceProfile(model) {
+      if (model === "Redmi 12C") {
+        return {
+          make: "Xiaomi",
+          model: "Redmi 12C",
+          software: "MIUI 14 / Android 13",
+          lensMake: "Xiaomi",
+          lensModel: "Redmi 12C back camera 4.266mm f/1.8",
+          focal: [4266, 1000],
+          fNum: [180, 100],
+          f35: 29,
+          iso: 50,
+          exposure: [1, 100]
+        };
+      }
+
+      const lower = model.toLowerCase();
+      let lens = {
+        lensModel: `${model} back camera 4.25mm f/1.8`,
+        focal: [425, 100],
+        fNum: [180, 100],
+        f35: 28,
+        iso: 50,
+        exposure: [1, 120]
+      };
+
+      if (/17|air/.test(lower)) lens = { lensModel: `${model} back camera 6.86mm f/1.78`, focal: [686, 100], fNum: [178, 100], f35: 24, iso: 50, exposure: [1, 120] };
+      else if (/16|15 pro|15 plus|15$/.test(lower)) lens = { lensModel: `${model} back camera 6.86mm f/1.78`, focal: [686, 100], fNum: [178, 100], f35: 24, iso: 50, exposure: [1, 120] };
+      else if (/14 pro/.test(lower)) lens = { lensModel: `${model} back camera 6.86mm f/1.78`, focal: [686, 100], fNum: [178, 100], f35: 24, iso: 50, exposure: [1, 120] };
+      else if (/14|13 pro/.test(lower)) lens = { lensModel: `${model} back camera 5.70mm f/1.5`, focal: [570, 100], fNum: [150, 100], f35: 26, iso: 50, exposure: [1, 120] };
+      else if (/13|12/.test(lower)) lens = { lensModel: `${model} back camera 5.10mm f/1.6`, focal: [510, 100], fNum: [160, 100], f35: 26, iso: 50, exposure: [1, 120] };
+      else if (/11/.test(lower)) lens = { lensModel: `${model} back camera 4.25mm f/1.8`, focal: [425, 100], fNum: [180, 100], f35: 26, iso: 50, exposure: [1, 120] };
+      else if (/xs|xr|x/.test(lower)) lens = { lensModel: `${model} back camera 4.00mm f/1.8`, focal: [400, 100], fNum: [180, 100], f35: 28, iso: 50, exposure: [1, 120] };
+      else if (/8|7/.test(lower)) lens = { lensModel: `${model} back camera 3.99mm f/1.8`, focal: [399, 100], fNum: [180, 100], f35: 28, iso: 50, exposure: [1, 120] };
+      else if (/6|5|se/.test(lower)) lens = { lensModel: `${model} back camera 4.15mm f/2.2`, focal: [415, 100], fNum: [220, 100], f35: 29, iso: 50, exposure: [1, 120] };
+      else if (/4s|4|3gs|3g/.test(lower)) lens = { lensModel: `${model} back camera 3.85mm f/2.8`, focal: [385, 100], fNum: [280, 100], f35: 35, iso: 80, exposure: [1, 60] };
+
+      return {
+        make: "Apple",
+        model,
+        software: getAutoIOSVersion(model),
+        lensMake: "Apple",
+        ...lens
+      };
+    }
+
+    function getAutoIOSVersion(model) {
+      const lower = model.toLowerCase();
+      if (/17|air|16|15|14|13|12|11|se \(3rd|se \(2nd/.test(lower)) return "26.4.2";
+      if (/xs|xr/.test(lower)) return "18.7.8";
+      if (/x|8|7|se \(1st/.test(lower)) return "16.7.11";
+      if (/6s/.test(lower)) return "15.8.4";
+      if (/6|5s/.test(lower)) return "12.5.7";
+      if (/5c|5/.test(lower)) return "10.3.4";
+      if (/4s/.test(lower)) return "9.3.6";
+      if (/4/.test(lower)) return "7.1.2";
+      if (/3gs/.test(lower)) return "6.1.6";
+      if (/3g/.test(lower)) return "4.2.1";
+      return "3.1.3";
+    }
+
+    function buildExifObject(meta) {
+      const zeroth = {};
+      const exif = {};
+      const gps = {};
+      const interop = {};
+
+      setExif(zeroth, piexif.ImageIFD.Make, meta.make);
+      setExif(zeroth, piexif.ImageIFD.Model, meta.model);
+      setExif(zeroth, piexif.ImageIFD.Orientation, 1);
+      setExif(zeroth, piexif.ImageIFD.XResolution, [72, 1]);
+      setExif(zeroth, piexif.ImageIFD.YResolution, [72, 1]);
+      setExif(zeroth, piexif.ImageIFD.ResolutionUnit, 2);
+      setExif(zeroth, piexif.ImageIFD.Software, meta.software);
+      setExif(zeroth, piexif.ImageIFD.HostComputer, meta.model);
+      setExif(zeroth, piexif.ImageIFD.YCbCrPositioning, 1);
+      setExif(zeroth, piexif.ImageIFD.DateTime, meta.dateLocal);
+      setExif(zeroth, piexif.ImageIFD.Artist, "");
+      setExif(zeroth, piexif.ImageIFD.Copyright, "");
+
+      setExif(exif, piexif.ExifIFD.ExposureTime, meta.exposure);
+      setExif(exif, piexif.ExifIFD.FNumber, meta.fNum);
+      setExif(exif, piexif.ExifIFD.ExposureProgram, 2);
+      setExif(exif, piexif.ExifIFD.ISOSpeedRatings, meta.iso);
+      setExif(exif, piexif.ExifIFD.ExifVersion, "0232");
+      setExif(exif, piexif.ExifIFD.DateTimeOriginal, meta.dateLocal);
+      setExif(exif, piexif.ExifIFD.DateTimeDigitized, meta.dateLocal);
+      setExif(exif, piexif.ExifIFD.OffsetTime, meta.offset);
+      setExif(exif, piexif.ExifIFD.OffsetTimeOriginal, meta.offset);
+      setExif(exif, piexif.ExifIFD.OffsetTimeDigitized, meta.offset);
+      setExif(exif, piexif.ExifIFD.SubSecTime, meta.subsec);
+      setExif(exif, piexif.ExifIFD.SubSecTimeOriginal, meta.subsec);
+      setExif(exif, piexif.ExifIFD.SubSecTimeDigitized, meta.subsec);
+      setExif(exif, piexif.ExifIFD.ComponentsConfiguration, "\x01\x02\x03\x00");
+      setExif(exif, piexif.ExifIFD.ShutterSpeedValue, rationalApprox(Math.log2(meta.exposure[1] / meta.exposure[0]), 1000));
+      const fNumDecimal = meta.fNum[0] / meta.fNum[1];
+      setExif(exif, piexif.ExifIFD.ApertureValue, rationalApprox(2 * Math.log2(fNumDecimal), 1000));
+      setExif(exif, piexif.ExifIFD.BrightnessValue, [455, 100]);
+      setExif(exif, piexif.ExifIFD.ExposureBiasValue, [0, 1]);
+      setExif(exif, piexif.ExifIFD.MaxApertureValue, rationalApprox(2 * Math.log2(fNumDecimal), 1000));
+      setExif(exif, piexif.ExifIFD.MeteringMode, 5);
+      setExif(exif, piexif.ExifIFD.Flash, 16);
+      setExif(exif, piexif.ExifIFD.FocalLength, meta.focal);
+      setExif(exif, piexif.ExifIFD.SubjectArea, [Math.floor(meta.width / 2), Math.floor(meta.height / 2), Math.floor(meta.width / 4), Math.floor(meta.height / 4)]);
+      setExif(exif, piexif.ExifIFD.MakerNote, undefined);
+      setExif(exif, piexif.ExifIFD.UserComment, undefined);
+      setExif(exif, piexif.ExifIFD.FlashpixVersion, "0100");
+      setExif(exif, piexif.ExifIFD.ColorSpace, 1);
+      setExif(exif, piexif.ExifIFD.PixelXDimension, meta.width);
+      setExif(exif, piexif.ExifIFD.PixelYDimension, meta.height);
+      setExif(exif, piexif.ExifIFD.SensingMethod, 2);
+      setExif(exif, piexif.ExifIFD.SceneType, "\x01");
+      setExif(exif, piexif.ExifIFD.ExposureMode, 0);
+      setExif(exif, piexif.ExifIFD.WhiteBalance, 0);
+      setExif(exif, piexif.ExifIFD.FocalLengthIn35mmFilm, meta.f35);
+      setExif(exif, piexif.ExifIFD.SceneCaptureType, 0);
+      setExif(exif, piexif.ExifIFD.LensSpecification, [meta.focal, meta.focal, meta.fNum, meta.fNum]);
+      setExif(exif, piexif.ExifIFD.LensMake, meta.lensMake);
+      setExif(exif, piexif.ExifIFD.LensModel, meta.lensModel);
+
+      setExif(interop, piexif.InteropIFD.InteroperabilityIndex, "R98");
+
+      if (Number.isFinite(meta.lat) && Number.isFinite(meta.lng)) {
+        setExif(gps, piexif.GPSIFD.GPSVersionID, [2, 3, 0, 0]);
+        setExif(gps, piexif.GPSIFD.GPSLatitudeRef, meta.lat >= 0 ? "N" : "S");
+        setExif(gps, piexif.GPSIFD.GPSLatitude, decimalToDMS(meta.lat));
+        setExif(gps, piexif.GPSIFD.GPSLongitudeRef, meta.lng >= 0 ? "E" : "W");
+        setExif(gps, piexif.GPSIFD.GPSLongitude, decimalToDMS(meta.lng));
+        setExif(gps, piexif.GPSIFD.GPSAltitudeRef, meta.altitude < 0 ? 1 : 0);
+        setExif(gps, piexif.GPSIFD.GPSAltitude, [Math.round(Math.abs(meta.altitude) * 100), 100]);
+        setExif(gps, piexif.GPSIFD.GPSSpeedRef, "K");
+        setExif(gps, piexif.GPSIFD.GPSSpeed, [0, 1]);
+        setExif(gps, piexif.GPSIFD.GPSImgDirectionRef, "T");
+        setExif(gps, piexif.GPSIFD.GPSImgDirection, [Math.round(meta.direction * 100), 100]);
+        setExif(gps, piexif.GPSIFD.GPSDestBearingRef, "T");
+        setExif(gps, piexif.GPSIFD.GPSDestBearing, [Math.round(meta.direction * 100), 100]);
+        setExif(gps, piexif.GPSIFD.GPSMapDatum, "WGS-84");
+        setExif(gps, piexif.GPSIFD.GPSDateStamp, meta.gpsDate);
+        setExif(gps, piexif.GPSIFD.GPSTimeStamp, meta.gpsTime);
+      }
+
+      cleanUndefinedKeys(zeroth);
+      cleanUndefinedKeys(exif);
+      cleanUndefinedKeys(gps);
+      cleanUndefinedKeys(interop);
+      return { "0th": zeroth, Exif: exif, GPS: gps, Interop: interop };
+    }
+
+    function setExif(ifd, tag, value) {
+      if (tag === undefined || tag === null || value === undefined || value === null) return;
+      ifd[tag] = value;
+    }
+
+    function cleanUndefinedKeys(ifd) {
+      Object.keys(ifd).forEach(key => {
+        if (key === "undefined" || key === "null" || ifd[key] === undefined || ifd[key] === null) delete ifd[key];
+      });
+    }
+
+    function buildPngTextMetadata(meta) {
+      return {
+        Software: meta.software,
+        Generator: META_SOURCE_NOTE,
+        Make: meta.make,
+        Model: meta.model,
+        LensMake: meta.lensMake,
+        LensModel: meta.lensModel,
+        CreationTime: meta.dateLocal,
+        LocationName: meta.locationName,
+        City: meta.city,
+        Country: meta.country,
+        GPSLatitude: String(meta.lat),
+        GPSLongitude: String(meta.lng),
+        GPSAltitude: String(meta.altitude),
+        GPSImgDirection: String(meta.direction),
+        PixelWidth: String(meta.width),
+        PixelHeight: String(meta.height)
+      };
+    }
+
+    function addPngTextChunks(pngBytes, textObj) {
+      const sig = [137,80,78,71,13,10,26,10];
+      if (!sig.every((b, i) => pngBytes[i] === b)) return pngBytes;
+      const chunks = parsePngChunks(pngBytes);
+      const ihdr = chunks.find(c => c.type === "IHDR");
+      if (!ihdr) return pngBytes;
+      const textChunks = Object.entries(textObj)
+        .filter(([key, value]) => key && value !== undefined && value !== null && String(value).length)
+        .map(([key, value]) => makePngTextChunk(key, String(value)));
+      return concatUint8([
+        pngBytes.slice(0, ihdr.end),
+        ...textChunks,
+        pngBytes.slice(ihdr.end)
+      ]);
+    }
+
+    function parsePngChunks(bytes) {
+      const chunks = [];
+      let offset = 8;
+      while (offset + 12 <= bytes.length) {
+        const length = readUint32(bytes, offset);
+        const type = asciiFromBytes(bytes.slice(offset + 4, offset + 8));
+        const end = offset + 12 + length;
+        if (end > bytes.length) break;
+        chunks.push({ type, start: offset, end, length });
+        offset = end;
+        if (type === "IEND") break;
+      }
+      return chunks;
+    }
+
+    function makePngTextChunk(keyword, value) {
+      const safeKeyword = keyword.replace(/[^A-Za-z0-9 _-]/g, "").slice(0, 79) || "Comment";
+      const data = new TextEncoder().encode(`${safeKeyword}\0${value}`);
+      return makePngChunk("tEXt", data);
+    }
+
+    function makePngChunk(type, data) {
+      const typeBytes = new TextEncoder().encode(type);
+      const out = new Uint8Array(12 + data.length);
+      writeUint32(out, 0, data.length);
+      out.set(typeBytes, 4);
+      out.set(data, 8);
+      const crcInput = new Uint8Array(typeBytes.length + data.length);
+      crcInput.set(typeBytes, 0);
+      crcInput.set(data, typeBytes.length);
+      writeUint32(out, 8 + data.length, crc32(crcInput));
+      return out;
+    }
+
+    function listPngChunks(bytes) {
+      try { return parsePngChunks(bytes).map(c => c.type); } catch { return []; }
+    }
+
+    function crc32(bytes) {
+      let c = -1;
+      for (let i = 0; i < bytes.length; i++) {
+        c = (c >>> 8) ^ crcTable[(c ^ bytes[i]) & 0xff];
+      }
+      return (c ^ -1) >>> 0;
+    }
+
+    const crcTable = (() => {
+      const table = new Uint32Array(256);
+      for (let n = 0; n < 256; n++) {
+        let c = n;
+        for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+        table[n] = c >>> 0;
+      }
+      return table;
+    })();
+
+    function readUint32(bytes, offset) {
+      return ((bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3]) >>> 0;
+    }
+
+    function writeUint32(bytes, offset, value) {
+      bytes[offset] = (value >>> 24) & 255;
+      bytes[offset + 1] = (value >>> 16) & 255;
+      bytes[offset + 2] = (value >>> 8) & 255;
+      bytes[offset + 3] = value & 255;
+    }
+
+    function concatUint8(parts) {
+      const total = parts.reduce((sum, part) => sum + part.length, 0);
+      const out = new Uint8Array(total);
+      let offset = 0;
+      parts.forEach(part => { out.set(part, offset); offset += part.length; });
+      return out;
+    }
+
+    function refreshSoftwareValue() {
+      const profile = getDeviceProfile(dom.deviceSelect.value);
+      if (dom.softwareMode.value === "auto") {
+        dom.softwareInput.value = profile.software;
+        dom.softwareInput.disabled = true;
+      } else {
+        dom.softwareInput.disabled = false;
+        if (!dom.softwareInput.value) dom.softwareInput.value = profile.software;
+      }
+      refreshMetadataPreview();
+    }
+
+    function applyLocationPreset(id, updateMap) {
+      const loc = currentLocations.find(item => item.id === id) || currentLocations[0];
+      if (!loc) return;
+      dom.latInput.value = Number(loc.lat).toFixed(6);
+      dom.lngInput.value = Number(loc.lng).toFixed(6);
+      dom.altInput.value = loc.altitude ?? 0;
+      dom.directionInput.value = loc.direction ?? 0;
+      if (updateMap) updateMapMarkerFromInputs(true);
+      refreshMetadataPreview();
+      saveState();
+    }
+
+    function updateCoordinates(lat, lng, save) {
+      dom.latInput.value = Number(lat).toFixed(6);
+      dom.lngInput.value = Number(lng).toFixed(6);
+      updateMapMarkerFromInputs(false);
+      refreshMetadataPreview();
+      if (save) saveState();
+    }
+
+    function updateMapMarkerFromInputs(recenter) {
+      const lat = Number(dom.latInput.value);
+      const lng = Number(dom.lngInput.value);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || !map || !marker) return;
+      marker.setLatLng([lat, lng]);
+      if (recenter) map.setView([lat, lng], 13);
+    }
+
+    function saveCustomLocation() {
+      const name = dom.newPresetName.value.trim();
+      const lat = Number(dom.latInput.value);
+      const lng = Number(dom.lngInput.value);
+      if (!name || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+        log("Pro uložení presetu zadej název a platné souřadnice.");
+        return;
+      }
+      const id = `custom_${sanitizeFileName(name).toLowerCase()}_${Date.now()}`;
+      const loc = {
+        id,
+        name,
+        city: name,
+        country: "Custom",
+        lat,
+        lng,
+        altitude: Number(dom.altInput.value) || 0,
+        direction: Number(dom.directionInput.value) || 0
+      };
+      currentLocations.push(loc);
+      populateLocationSelect();
+      dom.locationPreset.value = id;
+      dom.newPresetName.value = "";
+      saveState();
+      log(`Uložen nový preset: ${name}`);
+    }
+
+    function deleteCustomLocation() {
+      const id = dom.locationPreset.value;
+      if (defaultLocations.some(loc => loc.id === id)) {
+        log("Výchozí preset nelze smazat.");
+        return;
+      }
+      currentLocations = currentLocations.filter(loc => loc.id !== id);
+      populateLocationSelect();
+      saveState();
+      log("Vlastní preset byl smazán.");
+    }
+
+    function getSelectedLocation() {
+      return currentLocations.find(loc => loc.id === dom.locationPreset.value) || currentLocations[0];
+    }
+
+    function getSelectedLocationName() {
+      const loc = getSelectedLocation();
+      return loc ? loc.name : "Custom location";
+    }
+
+    function refreshMetadataPreview() {
+      const meta = buildMetadata(new Date(), Number(dom.customWidth.value) || 0, Number(dom.customHeight.value) || 0);
+      const rows = [
+        ["Make", meta.make],
+        ["Model", meta.model],
+        ["Software", meta.software],
+        ["Lens", meta.lensModel],
+        ["Location", `${meta.locationName} · ${Number(meta.lat).toFixed(6)}, ${Number(meta.lng).toFixed(6)}`],
+        ["Altitude / Direction", `${meta.altitude} m · ${meta.direction}°`],
+        ["Date/Time", "aktuální čas exportu"],
+        ["Output", `${dom.outputFormat.value.toUpperCase()} · ${getOutputSizeLabel()} · názvy ${dom.filePrefix.value || "IMG"}_0001`]
+      ];
+      dom.metadataPreviewBody.innerHTML = rows.map(([k, v]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(String(v))}</td></tr>`).join("");
+      if (fileRows.length) renderFileTable();
+    }
+
+    function refreshCustomSizeVisibility() {
+      dom.customSizeRow.classList.toggle("hidden", dom.sizePreset.value !== "custom");
+    }
+
+    function runSelfCheck() {
+      const checks = [
+        { name: "EXIF JPEG", ok: typeof piexif !== "undefined" },
+        { name: "ZIP batch", ok: typeof JSZip !== "undefined" },
+        { name: "HEIC input", ok: typeof heic2any !== "undefined" },
+        { name: "Map", ok: typeof L !== "undefined" },
+        { name: "Canvas", ok: !!document.createElement("canvas").getContext }
+      ];
+      dom.selfCheckPills.innerHTML = checks.map(check => `<span class="pill ${check.ok ? "good" : "bad"}">${check.ok ? "✓" : "!"} ${check.name}</span>`).join("");
+      dom.processBtn.disabled = files.length === 0 || !hasRequiredLibraries();
+      if (!checks.every(c => c.ok)) log("Některá CDN knihovna se nenačetla. Na GitHub Pages to obvykle funguje; při offline použití je potřeba vložit knihovny lokálně.");
+    }
+
+    function hasRequiredLibraries() {
+      return typeof piexif !== "undefined" && typeof JSZip !== "undefined";
+    }
+
+    function buildOutputFileName(index, format) {
+      const prefix = sanitizeFileName(dom.filePrefix.value || "IMG");
+      const start = Number(dom.startNumber.value) || 0;
+      const pad = clamp(Number(dom.padLength.value) || 4, 2, 8);
+      const num = String(start + index).padStart(pad, "0");
+      return `${prefix}_${num}.${format === "jpeg" ? "jpg" : "png"}`;
+    }
+
+    function setProgress(percent) { dom.progressBar.style.width = `${Math.max(0, Math.min(100, percent))}%`; }
+
+    function log(message) {
+      const time = new Date().toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      dom.logBox.textContent += `\n[${time}] ${message}`;
+      dom.logBox.scrollTop = dom.logBox.scrollHeight;
+    }
+
+    function decimalToDMS(decimal) {
+      const d = Math.abs(decimal);
+      const deg = Math.floor(d);
+      const minFloat = (d - deg) * 60;
+      const min = Math.floor(minFloat);
+      const sec = (minFloat - min) * 60;
+      return [[deg, 1], [min, 1], [Math.round(sec * 10000), 10000]];
+    }
+
+    function rationalApprox(value, denominator) {
+      return [Math.round(value * denominator), denominator];
+    }
+
+    function formatExifDate(date) {
+      return `${date.getFullYear()}:${pad2(date.getMonth() + 1)}:${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+    }
+
+    function formatExifDateUTC(date) {
+      return `${date.getUTCFullYear()}:${pad2(date.getUTCMonth() + 1)}:${pad2(date.getUTCDate())} ${pad2(date.getUTCHours())}:${pad2(date.getUTCMinutes())}:${pad2(date.getUTCSeconds())}`;
+    }
+
+    function getTimezoneOffsetString(date) {
+      const tzOffset = -date.getTimezoneOffset();
+      const sign = tzOffset >= 0 ? "+" : "-";
+      const hours = pad2(Math.floor(Math.abs(tzOffset) / 60));
+      const mins = pad2(Math.abs(tzOffset) % 60);
+      return `${sign}${hours}:${mins}`;
+    }
+
+    function pad2(num) { return String(num).padStart(2, "0"); }
+    function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+
+    function fileToDataURL(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function dataURLToBlob(dataUrl) {
+      const [header, base64] = dataUrl.split(",");
+      const mime = (header.match(/data:(.*?);base64/) || [])[1] || "application/octet-stream";
+      const bin = atob(base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return new Blob([bytes], { type: mime });
+    }
+
+    function dataURLToBytes(dataUrl) {
+      const base64 = dataUrl.split(",")[1];
+      const bin = atob(base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return bytes;
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 2500);
+    }
+
+    function timestampForName(date) {
+      return `${date.getFullYear()}${pad2(date.getMonth() + 1)}${pad2(date.getDate())}_${pad2(date.getHours())}${pad2(date.getMinutes())}${pad2(date.getSeconds())}`;
+    }
+
+    function sanitizeFileName(input) {
+      return String(input || "IMG").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "IMG";
+    }
+
+    function escapeHtml(input) {
+      return String(input).replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[ch]));
+    }
+
+    function escapeAttr(input) { return escapeHtml(input).replace(/'/g, "&#039;"); }
+
+    function formatBytes(bytes) {
+      if (!Number.isFinite(bytes)) return "";
+      if (bytes < 1024) return `${bytes} B`;
+      const units = ["KB", "MB", "GB"];
+      let size = bytes / 1024;
+      let unit = 0;
+      while (size >= 1024 && unit < units.length - 1) { size /= 1024; unit++; }
+      return `${size.toFixed(size >= 10 ? 1 : 2)} ${units[unit]}`;
+    }
+
+    function getExt(name) {
+      return (String(name).split(".").pop() || "").toUpperCase();
+    }
+
+    function asciiFromBytes(bytes) {
+      return Array.from(bytes).map(b => String.fromCharCode(b)).join("");
+    }
+
+    function findAscii(bytes, text) {
+      const needle = Array.from(text).map(ch => ch.charCodeAt(0));
+      outer: for (let i = 0; i <= bytes.length - needle.length; i++) {
+        for (let j = 0; j < needle.length; j++) {
+          if (bytes[i + j] !== needle[j]) continue outer;
+        }
+        return true;
+      }
+      return false;
+    }
+  </script>
+</body>
+</html>
